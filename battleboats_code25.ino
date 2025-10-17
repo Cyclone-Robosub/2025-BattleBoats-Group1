@@ -1,99 +1,99 @@
 #include "motors.h"
 #include "ultrasonic.h"
 
+/* Global Constants */
+#define FRONT_SENSOR 0 // FINISH REST OF DEFINITIONS
+#define SIDE_SENSOR 1
+#define regDelayTimeMS 100 // PLACEHOLDER
+#define turnDelayTimeMS 5 // PLACEHOLDER
+#define turnSpeedRPM 70 // 0 - 255, should cnabe in 70-90 range
+#define forwardSpeedRPM 90 // 0 - 255, should be in 70-90 range
+#define minFrontDistance 100 // PLACEHOLDER
+#define minRightDistance 50 // PLACEHOLDER
+#define numReadings 10 //ADJUST WINDOW TO SEE IF MORE ACCURATE
+
+//Parameters for Sensor Readings Method 
+float readings[numReadings]; 
+int index = 0; 
+float total = 0; 
+float average = 0; 
+
+/* Function Declarations */
+float avgSensorReadingMethod1(int sensor);
+float avgSensorDist(int sensor);
+bool checkIfTurn(float currFrontDist);
+bool checkIfRightTurn(float currSideDist);
+
 void setup() {
   Serial.begin(9600);
   motorInit();
   ultrasonicInit();
 }
 
-void loop() {
-  float dist = readDistanceCM();
-  float dist2 = readDistanceCM2();
-  
-  Serial.print("Distance: ");
-  Serial.print(dist);
-  Serial.println(" cm");|
-  
-  Serial.println("Distance: ";
-  Serial.print(dist2);
-  Serial.print(" cm");
+// void loop(){
+//   float currFrontDist = avgSensorDist(FRONT_SENSOR);
+//   Serial.println(currFrontDist);
 
-  if (dist > 15) {
-    driveForward(150);
-  } else {
-    driveStop();
+//   // float currSideDist = avgSensorReadingMethod1(SIDE_SENSOR);
+//   // Serial.println(currFrontDist);
+
+//   delay(regDelayTimeMS);
+// }
+
+void loop() { 
+  float currFrontDist = avgSensorDist(FRONT_SENSOR);
+  float currSideDist = avgSensorDist(SIDE_SENSOR);
+
+  bool shouldTurn = checkIfTurn(currFrontDist);
+  bool rightTurn;
+
+  if(shouldTurn){
+    rightTurn = checkIfRightTurn(currSideDist);
+
+    if(rightTurn) turnRight(turnSpeedRPM);
+    else turnLeft(turnSpeedRPM);
+
+    delay(turnDelayTimeMS); 
   }
 
-  delay(100);
-}
-/*moving average filter code(https://maker.pro/arduino/tutorial/how-to-clean-up-noisy-sensor-data-with-a-moving-average-filter),
-//Larger window size would make the data flatter BUT could cause signal lag and infomation loss
-#define IN_PIN A0
-#define WINDOW_SIZE 5
-
-int INDEX = 0;
-int VALUE = 0;
-int SUM = 0;
-int READINGS[WINDOW_SIZE];
-int AVERAGED = 0;
-
-void setup() {
-  pinMode(IN_PIN, INPUT);
-  Serial.begin(9600);
-}
-
-void loop() {
+  driveForward(forwardSpeedRPM);
   
-  SUM = SUM - READINGS[INDEX];       // Remove the oldest entry from the sum
-  VALUE = analogRead(IN_PIN);        // Read the next sensor value
-  READINGS[INDEX] = VALUE;           // Add the newest reading to the window
-  SUM = SUM + VALUE;                 // Add the newest reading to the sum
-  INDEX = (INDEX+1) % WINDOW_SIZE;   // Increment the index, and wrap to 0 if it exceeds the window size
-
-  AVERAGED = SUM / WINDOW_SIZE;      // Divide the sum of the window by the window size for the result
-
-  Serial.print(VALUE);
-  Serial.print(",");
-  Serial.println(AVERAGED);
-*/
-/*another moving average filter (https://energia.nu/guide/tutorials/analog/tutorial_smoothing/)
-const int numReadings = 10;
-
-int readings[numReadings]; // the readings from the analog input
-int index = 0; // the index of the current reading
-int total = 0; // the running total
-int average = 0; // the average
-
-int inputPin = A3;
-
-void setup()
-{
-  // initialize serial communication with computer:
-  Serial.begin(9600);
-  // initialize all the readings to 0:
-  for (int thisReading = 0; thisReading < numReadings; thisReading++)
-    readings[thisReading] = 0;
+  delay(regDelayTimeMS);
 }
 
-void loop() {
-  // subtract the last reading:
-  total= total - readings[index];
-  // read from the sensor:
-  readings[index] = analogRead(inputPin);//analogRead(inputPin)Reads the value from a specified analog input pin
-  // add the reading to the total:
-  total= total + readings[index];
-  // advance to the next position in the array:
+/*
+Parameters: current distance from front sensor
+Description: check if turning conditions have been met
+Explanation: ie. if K.C is about to run into a wall
+*/ 
+bool checkIfTurn(float currFrontDist){
+  return currFrontDist <= minFrontDistance;
+}
+
+/*
+Parameters: current distance from side sensor
+Description: check if turning left or right
+Explanation: ie. if K.C's right side is a wall or not
+*/
+bool checkIfRightTurn(float currSideDist){
+  return currSideDist > minRightDistance;
+}
+
+/*
+Description: another moving average filter 
+Source: (https://energia.nu/guide/tutorials/analog/tutorial_smoothing/)
+Considerations: Essentially same method as last, just better readability
+Other: IF SELECTED, TO BE RENAMED TO: avgSensorDist(int sensor)
+*/
+float avgSensorDist(int sensor){
+  total = total - readings[index];
+  if(sensor == FRONT_SENSOR) readings[index] ? readFrontDistCM(): readSideDistCM();
+  total = total + readings[index];
   index = index + 1;
 
-  // if we're at the end of the array...
-  if (index >= numReadings)
-    // ...wrap around to the beginning:
-    index = 0;
+  if (index >= numReadings) index = 0; // if at the end of the array, wrap to beginning
 
-  // calculate the average:
   average = total / numReadings;
-  // send it to the computer as ASCII digits
-  Serial.println(average);
-  delay(1); // delay in between reads for stability
-}*/
+
+  return average;
+}
